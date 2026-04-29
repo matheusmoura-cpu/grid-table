@@ -8,6 +8,9 @@ interface CardViewProps {
   data: MachineRecord[];
   visibleColumns: string[];
   matches: Map<number, Map<string, [number, number][]>>;
+  selectedIds: Set<number>;
+  onToggleRow: (id: number) => void;
+  onSiteClick: (machineId: number) => void;
 }
 
 const statusColumns = ['connectivityStatus', 'commissioningState', 'workingState', 'targetWorkingState'];
@@ -18,7 +21,7 @@ function getConnectivityIcon(status: string) {
   return <WifiOff className="h-4 w-4 text-slate-400" />;
 }
 
-export function CardView({ data, visibleColumns, matches }: CardViewProps) {
+export function CardView({ data, visibleColumns, matches, selectedIds, onToggleRow, onSiteClick }: CardViewProps) {
   if (data.length === 0) {
     return (
       <div className="text-center py-12 text-slate-500">
@@ -32,26 +35,46 @@ export function CardView({ data, visibleColumns, matches }: CardViewProps) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {data.map(record => {
         const recordMatches = matches.get(record.id);
+        const isSelected = selectedIds.has(record.id);
         return (
           <div
             key={record.id}
-            className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md
-                       transition-shadow p-4 space-y-3"
+            className={`bg-white rounded-xl border shadow-sm hover:shadow-md
+                       transition-shadow p-4 space-y-3
+                       ${isSelected ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200'}`}
           >
             <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-slate-900 truncate text-sm">
-                  <HighlightedCell
-                    value={record.site}
-                    indices={recordMatches?.get('site')}
-                  />
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  <HighlightedCell
-                    value={record.uniqueMachineNumber}
-                    indices={recordMatches?.get('uniqueMachineNumber')}
-                  />
-                </p>
+              <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleRow(record.id)}
+                  className="h-4 w-4 mt-0.5 rounded border-slate-300 text-blue-600
+                             focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                  aria-label={`Select ${record.site}`}
+                />
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-sm truncate">
+                    <button
+                      onClick={() => onSiteClick(record.id)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline underline-offset-2
+                                 decoration-blue-300 transition-colors text-left
+                                 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 rounded"
+                      aria-label={`View details for ${record.site}`}
+                    >
+                      <HighlightedCell
+                        value={record.site}
+                        indices={recordMatches?.get('site')}
+                      />
+                    </button>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    <HighlightedCell
+                      value={record.uniqueMachineNumber}
+                      indices={recordMatches?.get('uniqueMachineNumber')}
+                    />
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2 ml-2">
                 {getConnectivityIcon(record.connectivityStatus)}

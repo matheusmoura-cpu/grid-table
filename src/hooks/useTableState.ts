@@ -15,6 +15,8 @@ export function useTableState() {
   const [filters, setFilters] = useState<FilterCriteria[]>(loadActiveFilters);
   const [searchQuery, setSearchQuery] = useState(loadSearchQuery);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [currentPage, setCurrentPage] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 300);
@@ -116,13 +118,52 @@ export function useTableState() {
     setPreferences(prev => deleteSavedFilterSet(id, prev));
   }, []);
 
+  const toggleRowSelection = useCallback((id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleAllSelection = useCallback((ids: number[]) => {
+    setSelectedIds(prev => {
+      const allSelected = ids.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...ids]);
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const navigateToSite = useCallback((machineId: number) => {
+    setCurrentPage(`site-detail:${machineId}`);
+  }, []);
+
+  const navigateBack = useCallback(() => {
+    setCurrentPage(null);
+  }, []);
+
   return {
     ...processedData,
+    allData: machineData,
     isLoading,
     error,
     searchQuery,
     filters,
     preferences,
+    selectedIds,
+    currentPage,
     addFilter,
     removeFilter,
     clearAllFilters,
@@ -136,5 +177,10 @@ export function useTableState() {
     loadFilterSet,
     removeFilterSet,
     setFilters,
+    toggleRowSelection,
+    toggleAllSelection,
+    clearSelection,
+    navigateToSite,
+    navigateBack,
   };
 }

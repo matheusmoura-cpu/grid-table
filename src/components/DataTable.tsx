@@ -26,6 +26,10 @@ interface DataTableProps {
   matches: Map<number, Map<string, [number, number][]>>;
   totalCount: number;
   filteredCount: number;
+  selectedIds: Set<number>;
+  onToggleRow: (id: number) => void;
+  onToggleAll: (ids: number[]) => void;
+  onSiteClick: (machineId: number) => void;
 }
 
 const statusColumns = new Set(['connectivityStatus', 'commissioningState', 'workingState', 'targetWorkingState']);
@@ -44,6 +48,10 @@ export function DataTable({
   matches,
   totalCount,
   filteredCount,
+  selectedIds,
+  onToggleRow,
+  onToggleAll,
+  onSiteClick,
 }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
@@ -62,6 +70,20 @@ export function DataTable({
           const rowId = info.row.original.id;
           const recordMatches = matches.get(rowId);
           const fieldMatches = recordMatches?.get(key);
+
+          if (key === 'site') {
+            return (
+              <button
+                onClick={(e) => { e.stopPropagation(); onSiteClick(info.row.original.id); }}
+                className="text-blue-600 hover:text-blue-800 hover:underline underline-offset-2
+                           decoration-blue-300 transition-colors text-left font-medium
+                           focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 rounded"
+                aria-label={`View details for ${value}`}
+              >
+                <HighlightedCell value={value} indices={fieldMatches} />
+              </button>
+            );
+          }
 
           if (statusColumns.has(key)) {
             const statusType = key === 'connectivityStatus' ? 'connectivity'
@@ -82,7 +104,7 @@ export function DataTable({
         },
       });
     });
-  }, [visibleColumns, columnOrder, columnWidths, viewMode, matches]);
+  }, [visibleColumns, columnOrder, columnWidths, viewMode, matches, onSiteClick]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -121,6 +143,10 @@ export function DataTable({
 
   const isCompact = viewMode === 'compact';
 
+  const pageRowIds = table.getRowModel().rows.map(r => r.original.id);
+  const allPageSelected = pageRowIds.length > 0 && pageRowIds.every(id => selectedIds.has(id));
+  const somePageSelected = pageRowIds.some(id => selectedIds.has(id));
+
   if (data.length === 0) {
     return (
       <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
@@ -133,7 +159,6 @@ export function DataTable({
 
   return (
     <div className="space-y-3">
-      {/* Table container with horizontal scroll */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table
@@ -144,6 +169,23 @@ export function DataTable({
           >
             <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50 border-b border-slate-200">
+                {/* Select-all checkbox column */}
+                <th
+                  className={`text-center border-b border-slate-200 select-none
+                             ${isCompact ? 'px-2 py-2' : 'px-3 py-3'} w-12`}
+                  scope="col"
+                >
+                  <input
+                    type="checkbox"
+                    checked={allPageSelected}
+                    ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
+                    onChange={() => onToggleAll(pageRowIds)}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500
+                               cursor-pointer"
+                    aria-label={allPageSelected ? 'Deselect all visible rows' : 'Select all visible rows'}
+                  />
+                </th>
+
                 {table.getHeaderGroups().map(headerGroup =>
                   headerGroup.headers.map(header => {
                     const colKey = header.column.id;
@@ -177,7 +219,6 @@ export function DataTable({
                             <ArrowUpDown className="h-3.5 w-3.5 flex-shrink-0 opacity-0 group-hover:opacity-50" />
                           )}
                         </button>
-                        {/* Column resize handle */}
                         <div
                           className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize
                                      hover:bg-blue-400 active:bg-blue-500"
@@ -192,34 +233,55 @@ export function DataTable({
               </tr>
             </thead>
             <tbody>
-              {table.getRowModel().rows.map((row, rowIndex) => (
-                <tr
-                  key={row.id}
-                  className={`border-b border-slate-100 hover:bg-blue-50/30 transition-colors
-                             ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}
-                  role="row"
-                >
-                  {row.getVisibleCells().map(cell => (
+              {table.getRowModel().rows.map((row, rowIndex) => {
+                const isSelected = selectedIds.has(row.original.id);
+                return (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-slate-100 transition-colors
+                               ${isSelected
+                                 ? 'bg-blue-50/60 hover:bg-blue-50'
+                                 : rowIndex % 2 === 0
+                                   ? 'bg-white hover:bg-blue-50/30'
+                                   : 'bg-slate-50/30 hover:bg-blue-50/30'
+                               }`}
+                    role="row"
+                    aria-selected={isSelected}
+                  >
                     <td
-                      key={cell.id}
-                      className={`text-slate-700 border-b border-slate-100
-                                 ${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm'}
-                                 max-w-[300px] truncate`}
+                      className={`text-center border-b border-slate-100
+                                 ${isCompact ? 'px-2 py-1.5' : 'px-3 py-3'} w-12`}
                       role="gridcell"
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleRow(row.original.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500
+                                   cursor-pointer"
+                        aria-label={`Select ${row.original.site} - ${row.original.uniqueMachineNumber}`}
+                      />
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {row.getVisibleCells().map(cell => (
+                      <td
+                        key={cell.id}
+                        className={`text-slate-700 border-b border-slate-100
+                                   ${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm'}
+                                   max-w-[300px] truncate`}
+                        role="gridcell"
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Pagination - chosen over infinite scroll: pagination gives users clear position context,
-          is more predictable for accessibility/keyboard navigation, and works better with the
-          filtering/sorting model since the full dataset is already client-side */}
+      {/* Pagination */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-4">
           <p className="text-sm text-slate-500">
@@ -240,6 +302,12 @@ export function DataTable({
               <span className="text-slate-400"> (filtered from {totalCount})</span>
             )}
           </p>
+
+          {selectedIds.size > 0 && (
+            <span className="text-sm text-blue-600 font-medium">
+              {selectedIds.size} selected
+            </span>
+          )}
 
           <div className="flex items-center gap-2">
             <label htmlFor="page-size" className="text-sm text-slate-500">Rows:</label>

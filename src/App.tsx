@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Download, Database, AlertCircle, Loader2 } from 'lucide-react';
 import { useTableState } from './hooks/useTableState';
 import { SearchBar } from './components/SearchBar';
@@ -6,10 +7,33 @@ import { ColumnManager } from './components/ColumnManager';
 import { ViewToggle } from './components/ViewToggle';
 import { DataTable } from './components/DataTable';
 import { CardView } from './components/CardView';
+import { SiteDetail } from './components/SiteDetail';
 import { exportToCsv } from './utils/csv';
 
 function App() {
   const state = useTableState();
+
+  const siteDetailMachine = useMemo(() => {
+    if (!state.currentPage?.startsWith('site-detail:')) return null;
+    const machineId = Number(state.currentPage.split(':')[1]);
+    return state.allData.find(m => m.id === machineId) ?? null;
+  }, [state.currentPage, state.allData]);
+
+  const siteMachines = useMemo(() => {
+    if (!siteDetailMachine) return [];
+    return state.allData.filter(m => m.site === siteDetailMachine.site);
+  }, [siteDetailMachine, state.allData]);
+
+  const handleExport = () => {
+    const selectedData = state.selectedIds.size > 0
+      ? state.data.filter(row => state.selectedIds.has(row.id))
+      : state.data;
+    exportToCsv(selectedData, state.preferences.columns.visible);
+  };
+
+  const exportLabel = state.selectedIds.size > 0
+    ? `Export ${state.selectedIds.size} Selected`
+    : 'Export CSV';
 
   if (state.error) {
     return (
@@ -45,21 +69,20 @@ function App() {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <Database className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900">Machine Fleet Dashboard</h1>
-                <p className="text-sm text-slate-500">
-                  {state.filteredCount} of {state.totalCount} machines
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <Database className="h-6 w-6 text-blue-600" />
             </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <SearchBar value={state.searchQuery} onChange={state.updateSearch} />
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Machine Fleet Dashboard</h1>
+              <p className="text-sm text-slate-500">
+                {state.filteredCount} of {state.totalCount} machines
+                {state.selectedIds.size > 0 && (
+                  <span className="text-blue-600 ml-2 font-medium">
+                    &middot; {state.selectedIds.size} selected
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         </div>
@@ -67,60 +90,105 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-4">
-        {/* Toolbar */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <FilterPanel
-            filters={state.filters}
-            onAddFilter={state.addFilter}
-            onRemoveFilter={state.removeFilter}
-            onClearAll={state.clearAllFilters}
-            savedFilterSets={state.preferences.savedFilterSets}
-            onSaveFilterSet={state.saveFilterSet}
-            onLoadFilterSet={state.loadFilterSet}
-            onRemoveFilterSet={state.removeFilterSet}
-          />
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <ViewToggle viewMode={state.preferences.viewMode} onChange={state.setViewMode} />
-            <ColumnManager
-              visibleColumns={state.preferences.columns.visible}
-              columnOrder={state.preferences.columns.order}
-              onToggleColumn={state.toggleColumn}
-              onReorderColumns={state.reorderColumns}
-            />
-            <button
-              onClick={() => exportToCsv(state.data, state.preferences.columns.visible)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600
-                         hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
-              aria-label="Export to CSV"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export CSV</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Table / Cards */}
-        {state.preferences.viewMode === 'card' ? (
-          <CardView
-            data={state.data}
-            visibleColumns={state.preferences.columns.visible}
-            matches={state.matches}
+        {/* Site Detail View */}
+        {siteDetailMachine ? (
+          <SiteDetail
+            machine={siteDetailMachine}
+            siteMachines={siteMachines}
+            onBack={state.navigateBack}
+            onNavigateToMachine={state.navigateToSite}
           />
         ) : (
-          <DataTable
-            data={state.data}
-            visibleColumns={state.preferences.columns.visible}
-            columnOrder={state.preferences.columns.order}
-            columnWidths={state.preferences.columns.widths}
-            onColumnResize={state.setColumnWidth}
-            viewMode={state.preferences.viewMode}
-            pageSize={state.preferences.pageSize}
-            onPageSizeChange={state.setPageSize}
-            matches={state.matches}
-            totalCount={state.totalCount}
-            filteredCount={state.filteredCount}
-          />
+          <>
+            {/* Search + Filter row: search left, filters after */}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <SearchBar value={state.searchQuery} onChange={state.updateSearch} />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ViewToggle viewMode={state.preferences.viewMode} onChange={state.setViewMode} />
+                  <ColumnManager
+                    visibleColumns={state.preferences.columns.visible}
+                    columnOrder={state.preferences.columns.order}
+                    onToggleColumn={state.toggleColumn}
+                    onReorderColumns={state.reorderColumns}
+                  />
+                  <button
+                    onClick={handleExport}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium
+                               rounded-lg transition-colors border
+                               ${state.selectedIds.size > 0
+                                 ? 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100'
+                                 : 'text-slate-600 border-slate-200 hover:bg-slate-100'
+                               }`}
+                    aria-label={exportLabel}
+                    title={state.selectedIds.size > 0
+                      ? `Export ${state.selectedIds.size} selected row(s) to CSV`
+                      : 'Export all filtered rows to CSV'}
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">{exportLabel}</span>
+                  </button>
+                </div>
+              </div>
+
+              <FilterPanel
+                filters={state.filters}
+                onAddFilter={state.addFilter}
+                onRemoveFilter={state.removeFilter}
+                onClearAll={state.clearAllFilters}
+                savedFilterSets={state.preferences.savedFilterSets}
+                onSaveFilterSet={state.saveFilterSet}
+                onLoadFilterSet={state.loadFilterSet}
+                onRemoveFilterSet={state.removeFilterSet}
+              />
+            </div>
+
+            {/* Selection indicator bar */}
+            {state.selectedIds.size > 0 && (
+              <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200
+                              rounded-lg" role="status" aria-live="polite">
+                <p className="text-sm text-blue-800">
+                  <span className="font-semibold">{state.selectedIds.size}</span> row{state.selectedIds.size !== 1 ? 's' : ''} selected
+                </p>
+                <button
+                  onClick={state.clearSelection}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear selection
+                </button>
+              </div>
+            )}
+
+            {/* Table / Cards */}
+            {state.preferences.viewMode === 'card' ? (
+              <CardView
+                data={state.data}
+                visibleColumns={state.preferences.columns.visible}
+                matches={state.matches}
+                selectedIds={state.selectedIds}
+                onToggleRow={state.toggleRowSelection}
+                onSiteClick={state.navigateToSite}
+              />
+            ) : (
+              <DataTable
+                data={state.data}
+                visibleColumns={state.preferences.columns.visible}
+                columnOrder={state.preferences.columns.order}
+                columnWidths={state.preferences.columns.widths}
+                onColumnResize={state.setColumnWidth}
+                viewMode={state.preferences.viewMode}
+                pageSize={state.preferences.pageSize}
+                onPageSizeChange={state.setPageSize}
+                matches={state.matches}
+                totalCount={state.totalCount}
+                filteredCount={state.filteredCount}
+                selectedIds={state.selectedIds}
+                onToggleRow={state.toggleRowSelection}
+                onToggleAll={state.toggleAllSelection}
+                onSiteClick={state.navigateToSite}
+              />
+            )}
+          </>
         )}
       </main>
     </div>
