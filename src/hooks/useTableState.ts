@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { FilterCriteria, UserPreferences, ViewMode, SavedFilterSet } from '../types';
 import { machineData } from '../data/machines';
 import { fuzzySearch, resetFuseInstance } from '../utils/search';
@@ -9,14 +9,27 @@ import {
   loadSearchQuery, saveSearchQuery,
   saveSavedFilterSet, deleteSavedFilterSet,
 } from '../utils/storage';
+import { buildUrl, readUrlState } from '../utils/urlState';
+
+function initSearchQuery(): string {
+  const urlState = readUrlState();
+  return urlState?.searchQuery ?? loadSearchQuery();
+}
+
+function initFilters(): FilterCriteria[] {
+  const urlState = readUrlState();
+  return urlState?.filters ?? loadActiveFilters();
+}
 
 export function useTableState() {
   const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences);
-  const [filters, setFilters] = useState<FilterCriteria[]>(loadActiveFilters);
-  const [searchQuery, setSearchQuery] = useState(loadSearchQuery);
+  const [filters, setFilters] = useState<FilterCriteria[]>(initFilters);
+  const [searchQuery, setSearchQuery] = useState(initSearchQuery);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [currentPage, setCurrentPage] = useState<string | null>(null);
+
+  const isPopstateRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 300);
@@ -34,6 +47,36 @@ export function useTableState() {
   useEffect(() => {
     savePreferences(preferences);
   }, [preferences]);
+
+  // Sync state -> URL (push)
+  useEffect(() => {
+    if (isPopstateRef.current) {
+      isPopstateRef.current = false;
+      return;
+    }
+    const url = buildUrl(searchQuery, filters);
+    const currentUrl = window.location.pathname + window.location.search;
+    if (url !== currentUrl) {
+      window.history.pushState({ searchQuery, filters }, '', url);
+    }
+  }, [searchQuery, filters]);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    function handlePopstate(event: PopStateEvent) {
+      isPopstateRef.current = true;
+      if (event.state) {
+        setSearchQuery(event.state.searchQuery ?? '');
+        setFilters(event.state.filters ?? []);
+      } else {
+        const urlState = readUrlState();
+        setSearchQuery(urlState?.searchQuery ?? '');
+        setFilters(urlState?.filters ?? []);
+      }
+    }
+    window.addEventListener('popstate', handlePopstate);
+    return () => window.removeEventListener('popstate', handlePopstate);
+  }, []);
 
   const processedData = useMemo(() => {
     try {

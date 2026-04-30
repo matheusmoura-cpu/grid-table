@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Search, X } from 'lucide-react';
 import { machineData } from '../data/machines';
 import { getAutocompleteSuggestions } from '../utils/search';
@@ -8,7 +8,11 @@ interface SearchBarProps {
   onChange: (value: string) => void;
 }
 
-export function SearchBar({ value, onChange }: SearchBarProps) {
+export interface SearchBarHandle {
+  focus: () => void;
+}
+
+export const SearchBar = forwardRef<SearchBarHandle, SearchBarProps>(function SearchBar({ value, onChange }, ref) {
   const [inputValue, setInputValue] = useState(value);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -16,6 +20,10 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }));
 
   const lastExternalValue = useRef(value);
   useEffect(() => {
@@ -83,6 +91,9 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
     inputRef.current?.focus();
   };
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
+  const shortcutLabel = isMac ? '⌘K' : 'Ctrl+K';
+
   return (
     <div ref={containerRef} className="relative w-full max-w-md">
       <div className="relative">
@@ -95,8 +106,9 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
           aria-autocomplete="list"
           aria-controls="search-suggestions"
           aria-label="Search all columns"
+          aria-keyshortcuts="Control+k Meta+k"
           placeholder="Search across all columns..."
-          className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm
+          className="w-full pl-10 pr-20 py-2.5 bg-white border border-slate-200 rounded-lg text-sm
                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                      placeholder:text-slate-400 shadow-sm"
           value={inputValue}
@@ -104,15 +116,23 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
           onKeyDown={handleKeyDown}
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
         />
-        {inputValue && (
-          <button
-            onClick={clear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            aria-label="Clear search"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+          {inputValue ? (
+            <button
+              onClick={clear}
+              className="text-slate-400 hover:text-slate-600"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px]
+                           font-medium text-slate-400 bg-slate-100 border border-slate-200
+                           rounded" aria-hidden="true">
+              {shortcutLabel}
+            </kbd>
+          )}
+        </div>
       </div>
 
       {showSuggestions && (
@@ -138,4 +158,4 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
       )}
     </div>
   );
-}
+});

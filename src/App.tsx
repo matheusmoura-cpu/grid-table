@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { Download, Database, AlertCircle, Loader2 } from 'lucide-react';
 import { useTableState } from './hooks/useTableState';
-import { SearchBar } from './components/SearchBar';
+import { SearchBar, type SearchBarHandle } from './components/SearchBar';
 import { FilterPanel } from './components/FilterPanel';
 import { ColumnManager } from './components/ColumnManager';
 import { ViewToggle } from './components/ViewToggle';
@@ -10,8 +10,28 @@ import { CardView } from './components/CardView';
 import { SiteDetail } from './components/SiteDetail';
 import { exportToCsv } from './utils/csv';
 
+const PAGE_TITLE = 'Machine Management Table Prototype';
+
 function App() {
   const state = useTableState();
+  const searchBarRef = useRef<SearchBarHandle>(null);
+
+  // CMD+K / CTRL+K global shortcut
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchBarRef.current?.focus();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Set document title
+  useEffect(() => {
+    document.title = PAGE_TITLE;
+  }, []);
 
   const siteDetailMachine = useMemo(() => {
     if (!state.currentPage?.startsWith('site-detail:')) return null;
@@ -74,7 +94,7 @@ function App() {
               <Database className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Machine Fleet Dashboard</h1>
+              <h1 className="text-xl font-bold text-slate-900">{PAGE_TITLE}</h1>
               <p className="text-sm text-slate-500">
                 {state.filteredCount} of {state.totalCount} machines
                 {state.selectedIds.size > 0 && (
@@ -103,7 +123,7 @@ function App() {
             {/* Search + Filter row: search left, filters after */}
             <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                <SearchBar value={state.searchQuery} onChange={state.updateSearch} />
+                <SearchBar ref={searchBarRef} value={state.searchQuery} onChange={state.updateSearch} />
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <ViewToggle viewMode={state.preferences.viewMode} onChange={state.setViewMode} />
                   <ColumnManager
