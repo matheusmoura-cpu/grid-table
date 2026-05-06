@@ -16,7 +16,6 @@ function App() {
   const state = useTableState();
   const searchBarRef = useRef<SearchBarHandle>(null);
 
-  // CMD+K / CTRL+K global shortcut
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -28,7 +27,6 @@ function App() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Set document title
   useEffect(() => {
     document.title = PAGE_TITLE;
   }, []);
@@ -57,7 +55,7 @@ function App() {
 
   if (state.error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="h-screen flex items-center justify-center bg-slate-50 p-4">
         <div className="bg-white rounded-xl shadow-sm border border-red-200 p-8 max-w-md text-center">
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-slate-900 mb-2">Something went wrong</h2>
@@ -75,7 +73,7 @@ function App() {
 
   if (state.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50" role="status" aria-live="polite">
+      <div className="h-screen flex items-center justify-center bg-slate-50" role="status" aria-live="polite">
         <div className="text-center">
           <Loader2 className="h-10 w-10 text-blue-600 animate-spin mx-auto mb-4" />
           <p className="text-sm text-slate-500">Loading machine data...</p>
@@ -84,10 +82,13 @@ function App() {
     );
   }
 
+  const isTableView = state.preferences.viewMode !== 'card';
+  const showingTable = !siteDetailMachine && isTableView;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 shadow-sm">
+    <div className={`bg-slate-50 flex flex-col ${showingTable ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+      {/* Header — always fixed height */}
+      <header className="bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 rounded-lg">
@@ -108,20 +109,22 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-4">
-        {/* Site Detail View */}
+      {/* Main content — fills remaining viewport height */}
+      <main className={`max-w-[1600px] w-full mx-auto px-4 sm:px-6 flex flex-col
+                        ${showingTable ? 'flex-1 min-h-0 py-4 gap-3' : 'py-6 space-y-4'}`}>
         {siteDetailMachine ? (
-          <SiteDetail
-            machine={siteDetailMachine}
-            siteMachines={siteMachines}
-            onBack={state.navigateBack}
-            onNavigateToMachine={state.navigateToSite}
-          />
+          <div className="overflow-auto flex-1">
+            <SiteDetail
+              machine={siteDetailMachine}
+              siteMachines={siteMachines}
+              onBack={state.navigateBack}
+              onNavigateToMachine={state.navigateToSite}
+            />
+          </div>
         ) : (
           <>
-            {/* Search + Filter row: search left, filters after */}
-            <div className="flex flex-col gap-4">
+            {/* Toolbar area — fixed height, does not scroll */}
+            <div className="flex flex-col gap-3 flex-shrink-0">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <SearchBar ref={searchBarRef} value={state.searchQuery} onChange={state.updateSearch} />
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -161,35 +164,25 @@ function App() {
                 onLoadFilterSet={state.loadFilterSet}
                 onRemoveFilterSet={state.removeFilterSet}
               />
+
+              {state.selectedIds.size > 0 && (
+                <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200
+                                rounded-lg" role="status" aria-live="polite">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-semibold">{state.selectedIds.size}</span> row{state.selectedIds.size !== 1 ? 's' : ''} selected
+                  </p>
+                  <button
+                    onClick={state.clearSelection}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Selection indicator bar */}
-            {state.selectedIds.size > 0 && (
-              <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200
-                              rounded-lg" role="status" aria-live="polite">
-                <p className="text-sm text-blue-800">
-                  <span className="font-semibold">{state.selectedIds.size}</span> row{state.selectedIds.size !== 1 ? 's' : ''} selected
-                </p>
-                <button
-                  onClick={state.clearSelection}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Clear selection
-                </button>
-              </div>
-            )}
-
-            {/* Table / Cards */}
-            {state.preferences.viewMode === 'card' ? (
-              <CardView
-                data={state.data}
-                visibleColumns={state.preferences.columns.visible}
-                matches={state.matches}
-                selectedIds={state.selectedIds}
-                onToggleRow={state.toggleRowSelection}
-                onSiteClick={state.navigateToSite}
-              />
-            ) : (
+            {/* Table or Cards — table fills remaining space */}
+            {isTableView ? (
               <DataTable
                 data={state.data}
                 visibleColumns={state.preferences.columns.visible}
@@ -205,6 +198,15 @@ function App() {
                 selectedIds={state.selectedIds}
                 onToggleRow={state.toggleRowSelection}
                 onToggleAll={state.toggleAllSelection}
+                onSiteClick={state.navigateToSite}
+              />
+            ) : (
+              <CardView
+                data={state.data}
+                visibleColumns={state.preferences.columns.visible}
+                matches={state.matches}
+                selectedIds={state.selectedIds}
+                onToggleRow={state.toggleRowSelection}
                 onSiteClick={state.navigateToSite}
               />
             )}

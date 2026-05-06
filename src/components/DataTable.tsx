@@ -33,6 +33,7 @@ interface DataTableProps {
 }
 
 const statusColumns = new Set(['connectivityStatus', 'commissioningState', 'workingState', 'targetWorkingState']);
+const CHECKBOX_COL_WIDTH = 48;
 
 const columnHelper = createColumnHelper<MachineRecord>();
 
@@ -55,16 +56,24 @@ export function DataTable({
 }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+  const [isScrolledX, setIsScrolledX] = useState(false);
+
+  const isCompact = viewMode === 'compact';
+  const defaultColWidth = isCompact ? 120 : 160;
+
+  const orderedVisible = useMemo(
+    () => columnOrder.filter(k => visibleColumns.includes(k)),
+    [columnOrder, visibleColumns],
+  );
 
   const columns = useMemo(() => {
-    const orderedVisible = columnOrder.filter(k => visibleColumns.includes(k));
     return orderedVisible.map(key => {
       const colDef = ALL_COLUMNS.find(c => c.key === key)!;
       const width = columnWidths[key];
 
       return columnHelper.accessor(key as keyof MachineRecord, {
         header: colDef.label,
-        size: width || (viewMode === 'compact' ? 120 : 160),
+        size: width || defaultColWidth,
         cell: info => {
           const value = String(info.getValue());
           const rowId = info.row.original.id;
@@ -104,7 +113,7 @@ export function DataTable({
         },
       });
     });
-  }, [visibleColumns, columnOrder, columnWidths, viewMode, matches, onSiteClick]);
+  }, [orderedVisible, columnWidths, defaultColWidth, matches, onSiteClick]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -121,7 +130,7 @@ export function DataTable({
   const handleMouseDown = useCallback((key: string, e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = columnWidths[key] || (viewMode === 'compact' ? 120 : 160);
+    const startWidth = columnWidths[key] || defaultColWidth;
     resizingRef.current = { key, startX, startWidth };
 
     const handleMouseMove = (ev: MouseEvent) => {
@@ -139,13 +148,18 @@ export function DataTable({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [columnWidths, viewMode, onColumnResize]);
+  }, [columnWidths, defaultColWidth, onColumnResize]);
 
-  const isCompact = viewMode === 'compact';
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const scrollLeft = (e.target as HTMLDivElement).scrollLeft;
+    setIsScrolledX(scrollLeft > 0);
+  }, []);
 
   const pageRowIds = table.getRowModel().rows.map(r => r.original.id);
   const allPageSelected = pageRowIds.length > 0 && pageRowIds.every(id => selectedIds.has(id));
   const somePageSelected = pageRowIds.some(id => selectedIds.has(id));
+
+  const stickyColShadow = isScrolledX ? 'sticky-col-shadow' : '';
 
   if (data.length === 0) {
     return (
@@ -158,43 +172,103 @@ export function DataTable({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table
-            className="w-full border-collapse"
-            role="grid"
-            aria-label="Machine fleet data"
-            aria-rowcount={data.length}
-          >
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-slate-50 border-b border-slate-200">
-                {/* Select-all checkbox column */}
-                <th
-                  className={`text-center border-b border-slate-200 select-none
-                             ${isCompact ? 'px-2 py-2' : 'px-3 py-3'} w-12`}
-                  scope="col"
-                >
-                  <input
-                    type="checkbox"
-                    checked={allPageSelected}
-                    ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
-                    onChange={() => onToggleAll(pageRowIds)}
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500
-                               cursor-pointer"
-                    aria-label={allPageSelected ? 'Deselect all visible rows' : 'Select all visible rows'}
-                  />
-                </th>
+    <div className="flex flex-col min-h-0 flex-1">
+      {/* Scrollable table region */}
+      <div
+        className="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 min-h-0 overflow-auto"
+        onScroll={handleScroll}
+        role="region"
+        aria-label="Scrollable table"
+        tabIndex={0}
+      >
+        <table
+          className="border-collapse"
+          style={{ minWidth: 'max-content' }}
+          role="grid"
+          aria-label="Machine fleet data"
+          aria-rowcount={data.length}
+        >
+          <thead>
+            <tr className="sticky-header-shadow">
+              {/* Checkbox header — sticky both axes, highest z-index */}
+              <th
+                className={`text-center border-b border-slate-200 select-none bg-slate-50
+                           ${isCompact ? 'px-2 py-2' : 'px-3 py-3'}
+                           sticky top-0 left-0 z-30 ${stickyColShadow}`}
+                style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                scope="col"
+              >
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
+                  onChange={() => onToggleAll(pageRowIds)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500
+                             cursor-pointer"
+                  aria-label={allPageSelected ? 'Deselect all visible rows' : 'Select all visible rows'}
+                />
+              </th>
 
-                {table.getHeaderGroups().map(headerGroup =>
-                  headerGroup.headers.map(header => {
+              {/* First data column header — sticky both axes */}
+              {table.getHeaderGroups().map(headerGroup => {
+                const headers = headerGroup.headers;
+                if (headers.length === 0) return null;
+
+                const firstHeader = headers[0];
+                const restHeaders = headers.slice(1);
+
+                return [
+                  <th
+                    key={firstHeader.id}
+                    className={`text-left font-semibold text-slate-600 border-b border-slate-200 select-none bg-slate-50
+                               ${isCompact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-xs'}
+                               group relative sticky top-0 z-30 ${stickyColShadow}`}
+                    style={{
+                      width: firstHeader.getSize(),
+                      minWidth: 60,
+                      left: CHECKBOX_COL_WIDTH,
+                      position: 'sticky',
+                    }}
+                    scope="col"
+                    aria-sort={
+                      firstHeader.column.getIsSorted()
+                        ? firstHeader.column.getIsSorted() === 'asc' ? 'ascending' : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <button
+                      className="inline-flex items-center gap-1 hover:text-slate-900 transition-colors w-full"
+                      onClick={firstHeader.column.getToggleSortingHandler()}
+                      aria-label={`Sort by ${flexRender(firstHeader.column.columnDef.header, firstHeader.getContext())}`}
+                    >
+                      <span className="truncate">
+                        {flexRender(firstHeader.column.columnDef.header, firstHeader.getContext())}
+                      </span>
+                      {firstHeader.column.getIsSorted() === 'asc' ? (
+                        <ArrowUp className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />
+                      ) : firstHeader.column.getIsSorted() === 'desc' ? (
+                        <ArrowDown className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 flex-shrink-0 opacity-0 group-hover:opacity-50" />
+                      )}
+                    </button>
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize
+                                 hover:bg-blue-400 active:bg-blue-500"
+                      onMouseDown={(e) => handleMouseDown(firstHeader.column.id, e)}
+                      role="separator"
+                      aria-orientation="vertical"
+                    />
+                  </th>,
+
+                  ...restHeaders.map(header => {
                     const colKey = header.column.id;
                     return (
                       <th
                         key={header.id}
-                        className={`text-left font-semibold text-slate-600 border-b border-slate-200 select-none
+                        className={`text-left font-semibold text-slate-600 border-b border-slate-200 select-none bg-slate-50
                                    ${isCompact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-xs'}
-                                   group relative`}
+                                   group relative sticky top-0 z-20`}
                         style={{ width: header.getSize(), minWidth: 60 }}
                         scope="col"
                         aria-sort={
@@ -228,61 +302,85 @@ export function DataTable({
                         />
                       </th>
                     );
-                  })
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row, rowIndex) => {
-                const isSelected = selectedIds.has(row.original.id);
-                return (
-                  <tr
-                    key={row.id}
-                    className={`border-b border-slate-100 transition-colors
-                               ${isSelected
-                                 ? 'bg-blue-50/60 hover:bg-blue-50'
-                                 : rowIndex % 2 === 0
-                                   ? 'bg-white hover:bg-blue-50/30'
-                                   : 'bg-slate-50/30 hover:bg-blue-50/30'
-                               }`}
-                    role="row"
-                    aria-selected={isSelected}
+                  }),
+                ];
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row, rowIndex) => {
+              const isSelected = selectedIds.has(row.original.id);
+              const rowBg = isSelected
+                ? 'bg-blue-50/80'
+                : rowIndex % 2 === 0
+                  ? 'bg-white'
+                  : 'bg-slate-50/50';
+              const rowBgHover = isSelected ? 'hover:bg-blue-50' : 'hover:bg-blue-50/30';
+
+              const cells = row.getVisibleCells();
+              const firstCell = cells[0];
+              const restCells = cells.slice(1);
+
+              return (
+                <tr
+                  key={row.id}
+                  className={`border-b border-slate-100 transition-colors ${rowBg} ${rowBgHover}`}
+                  role="row"
+                  aria-selected={isSelected}
+                >
+                  {/* Checkbox cell — sticky left */}
+                  <td
+                    className={`text-center border-b border-slate-100 sticky left-0 z-10
+                               ${isCompact ? 'px-2 py-1.5' : 'px-3 py-3'}
+                               ${rowBg} ${stickyColShadow}`}
+                    style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                    role="gridcell"
                   >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleRow(row.original.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500
+                                 cursor-pointer"
+                      aria-label={`Select ${row.original.site} - ${row.original.uniqueMachineNumber}`}
+                    />
+                  </td>
+
+                  {/* First data cell — sticky left (offset by checkbox width) */}
+                  {firstCell && (
                     <td
-                      className={`text-center border-b border-slate-100
-                                 ${isCompact ? 'px-2 py-1.5' : 'px-3 py-3'} w-12`}
+                      key={firstCell.id}
+                      className={`text-slate-700 border-b border-slate-100 sticky z-10
+                                 ${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm'}
+                                 max-w-[300px] truncate ${rowBg} ${stickyColShadow}`}
+                      style={{ left: CHECKBOX_COL_WIDTH }}
                       role="gridcell"
                     >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => onToggleRow(row.original.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500
-                                   cursor-pointer"
-                        aria-label={`Select ${row.original.site} - ${row.original.uniqueMachineNumber}`}
-                      />
+                      {flexRender(firstCell.column.columnDef.cell, firstCell.getContext())}
                     </td>
-                    {row.getVisibleCells().map(cell => (
-                      <td
-                        key={cell.id}
-                        className={`text-slate-700 border-b border-slate-100
-                                   ${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm'}
-                                   max-w-[300px] truncate`}
-                        role="gridcell"
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                  )}
+
+                  {/* Remaining cells — normal flow */}
+                  {restCells.map(cell => (
+                    <td
+                      key={cell.id}
+                      className={`text-slate-700 border-b border-slate-100
+                                 ${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm'}
+                                 max-w-[300px] truncate`}
+                      role="gridcell"
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Pagination */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
+      {/* Pagination — fixed below the table, never scrolls */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1 py-3 flex-shrink-0">
         <div className="flex items-center gap-4">
           <p className="text-sm text-slate-500">
             Showing{' '}
