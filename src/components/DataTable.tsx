@@ -35,6 +35,16 @@ interface DataTableProps {
 const statusColumns = new Set(['connectivityStatus', 'commissioningState', 'workingState', 'targetWorkingState']);
 const CHECKBOX_COL_WIDTH = 48;
 
+const ROW_BG = {
+  even: '#ffffff',
+  odd: '#f8fafc',
+  selected: '#eff6ff',
+  hoverEven: '#eff6ff',
+  hoverOdd: '#eff6ff',
+  hoverSelected: '#dbeafe',
+  header: '#f8fafc',
+} as const;
+
 const columnHelper = createColumnHelper<MachineRecord>();
 
 export function DataTable({
@@ -159,8 +169,6 @@ export function DataTable({
   const allPageSelected = pageRowIds.length > 0 && pageRowIds.every(id => selectedIds.has(id));
   const somePageSelected = pageRowIds.some(id => selectedIds.has(id));
 
-  const stickyColShadow = isScrolledX ? 'sticky-col-shadow' : '';
-
   if (data.length === 0) {
     return (
       <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
@@ -170,6 +178,15 @@ export function DataTable({
       </div>
     );
   }
+
+  function renderSortIcon(column: { getIsSorted: () => false | 'asc' | 'desc' }) {
+    const sorted = column.getIsSorted();
+    if (sorted === 'asc') return <ArrowUp className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />;
+    if (sorted === 'desc') return <ArrowDown className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />;
+    return <ArrowUpDown className="h-3.5 w-3.5 flex-shrink-0 opacity-0 group-hover:opacity-50" />;
+  }
+
+  const thPadding = isCompact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-xs';
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
@@ -182,20 +199,25 @@ export function DataTable({
         tabIndex={0}
       >
         <table
-          className="border-collapse"
+          className="border-separate border-spacing-0"
           style={{ minWidth: 'max-content' }}
           role="grid"
           aria-label="Machine fleet data"
           aria-rowcount={data.length}
         >
           <thead>
-            <tr className="sticky-header-shadow">
-              {/* Checkbox header — sticky both axes, highest z-index */}
+            <tr>
+              {/* Checkbox header — pinned top+left, highest z */}
               <th
-                className={`text-center border-b border-slate-200 select-none bg-slate-50
+                className={`text-center select-none border-b border-slate-200
                            ${isCompact ? 'px-2 py-2' : 'px-3 py-3'}
-                           sticky top-0 left-0 z-30 ${stickyColShadow}`}
-                style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                           sticky top-0 left-0 z-30
+                           ${isScrolledX ? 'sticky-col-edge' : ''}`}
+                style={{
+                  width: CHECKBOX_COL_WIDTH,
+                  minWidth: CHECKBOX_COL_WIDTH,
+                  backgroundColor: ROW_BG.header,
+                }}
                 scope="col"
               >
                 <input
@@ -209,7 +231,6 @@ export function DataTable({
                 />
               </th>
 
-              {/* First data column header — sticky both axes */}
               {table.getHeaderGroups().map(headerGroup => {
                 const headers = headerGroup.headers;
                 if (headers.length === 0) return null;
@@ -218,16 +239,18 @@ export function DataTable({
                 const restHeaders = headers.slice(1);
 
                 return [
+                  // First data column header — pinned top+left (offset)
                   <th
                     key={firstHeader.id}
-                    className={`text-left font-semibold text-slate-600 border-b border-slate-200 select-none bg-slate-50
-                               ${isCompact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-xs'}
-                               group relative sticky top-0 z-30 ${stickyColShadow}`}
+                    className={`text-left font-semibold text-slate-600 border-b border-slate-200 select-none
+                               ${thPadding} group relative
+                               sticky top-0 z-30
+                               ${isScrolledX ? 'sticky-col-edge' : ''}`}
                     style={{
                       width: firstHeader.getSize(),
                       minWidth: 60,
                       left: CHECKBOX_COL_WIDTH,
-                      position: 'sticky',
+                      backgroundColor: ROW_BG.header,
                     }}
                     scope="col"
                     aria-sort={
@@ -244,13 +267,7 @@ export function DataTable({
                       <span className="truncate">
                         {flexRender(firstHeader.column.columnDef.header, firstHeader.getContext())}
                       </span>
-                      {firstHeader.column.getIsSorted() === 'asc' ? (
-                        <ArrowUp className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />
-                      ) : firstHeader.column.getIsSorted() === 'desc' ? (
-                        <ArrowDown className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 flex-shrink-0 opacity-0 group-hover:opacity-50" />
-                      )}
+                      {renderSortIcon(firstHeader.column)}
                     </button>
                     <div
                       className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize
@@ -261,15 +278,20 @@ export function DataTable({
                     />
                   </th>,
 
+                  // Remaining column headers — pinned top only
                   ...restHeaders.map(header => {
                     const colKey = header.column.id;
                     return (
                       <th
                         key={header.id}
-                        className={`text-left font-semibold text-slate-600 border-b border-slate-200 select-none bg-slate-50
-                                   ${isCompact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-xs'}
-                                   group relative sticky top-0 z-20`}
-                        style={{ width: header.getSize(), minWidth: 60 }}
+                        className={`text-left font-semibold text-slate-600 border-b border-slate-200 select-none
+                                   ${thPadding} group relative
+                                   sticky top-0 z-20`}
+                        style={{
+                          width: header.getSize(),
+                          minWidth: 60,
+                          backgroundColor: ROW_BG.header,
+                        }}
                         scope="col"
                         aria-sort={
                           header.column.getIsSorted()
@@ -285,13 +307,7 @@ export function DataTable({
                           <span className="truncate">
                             {flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
-                          {header.column.getIsSorted() === 'asc' ? (
-                            <ArrowUp className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />
-                          ) : header.column.getIsSorted() === 'desc' ? (
-                            <ArrowDown className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />
-                          ) : (
-                            <ArrowUpDown className="h-3.5 w-3.5 flex-shrink-0 opacity-0 group-hover:opacity-50" />
-                          )}
+                          {renderSortIcon(header.column)}
                         </button>
                         <div
                           className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize
@@ -310,30 +326,39 @@ export function DataTable({
           <tbody>
             {table.getRowModel().rows.map((row, rowIndex) => {
               const isSelected = selectedIds.has(row.original.id);
-              const rowBg = isSelected
-                ? 'bg-blue-50/80'
+              const baseBg = isSelected
+                ? ROW_BG.selected
                 : rowIndex % 2 === 0
-                  ? 'bg-white'
-                  : 'bg-slate-50/50';
-              const rowBgHover = isSelected ? 'hover:bg-blue-50' : 'hover:bg-blue-50/30';
+                  ? ROW_BG.even
+                  : ROW_BG.odd;
+              const hoverBg = isSelected ? ROW_BG.hoverSelected : ROW_BG.hoverEven;
 
               const cells = row.getVisibleCells();
               const firstCell = cells[0];
               const restCells = cells.slice(1);
 
+              const tdPadding = isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm';
+
               return (
                 <tr
                   key={row.id}
-                  className={`border-b border-slate-100 transition-colors ${rowBg} ${rowBgHover}`}
+                  className="group/row transition-colors"
                   role="row"
                   aria-selected={isSelected}
+                  style={{ backgroundColor: baseBg }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = hoverBg; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = baseBg; }}
                 >
-                  {/* Checkbox cell — sticky left */}
+                  {/* Checkbox cell — sticky left:0 */}
                   <td
                     className={`text-center border-b border-slate-100 sticky left-0 z-10
                                ${isCompact ? 'px-2 py-1.5' : 'px-3 py-3'}
-                               ${rowBg} ${stickyColShadow}`}
-                    style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                               ${isScrolledX ? 'sticky-col-edge' : ''}`}
+                    style={{
+                      width: CHECKBOX_COL_WIDTH,
+                      minWidth: CHECKBOX_COL_WIDTH,
+                      backgroundColor: 'inherit',
+                    }}
                     role="gridcell"
                   >
                     <input
@@ -351,9 +376,12 @@ export function DataTable({
                     <td
                       key={firstCell.id}
                       className={`text-slate-700 border-b border-slate-100 sticky z-10
-                                 ${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm'}
-                                 max-w-[300px] truncate ${rowBg} ${stickyColShadow}`}
-                      style={{ left: CHECKBOX_COL_WIDTH }}
+                                 ${tdPadding} max-w-[300px] truncate
+                                 ${isScrolledX ? 'sticky-col-edge' : ''}`}
+                      style={{
+                        left: CHECKBOX_COL_WIDTH,
+                        backgroundColor: 'inherit',
+                      }}
                       role="gridcell"
                     >
                       {flexRender(firstCell.column.columnDef.cell, firstCell.getContext())}
@@ -364,9 +392,7 @@ export function DataTable({
                   {restCells.map(cell => (
                     <td
                       key={cell.id}
-                      className={`text-slate-700 border-b border-slate-100
-                                 ${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm'}
-                                 max-w-[300px] truncate`}
+                      className={`text-slate-700 border-b border-slate-100 ${tdPadding} max-w-[300px] truncate`}
                       role="gridcell"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -5,8 +5,6 @@
     --color-primary: #2563eb;
     --color-primary-light: #3b82f6;
     --color-primary-dark: #1d4ed8;
-    --sticky-col0-width: 48px;
-    --sticky-col1-width: 160px;
   }
 
   html, body, #root {
@@ -27,15 +25,23 @@
     padding: 0 1px;
   }
 
-  /* Sticky column shadow — shown when scrolled horizontally */
-  .sticky-col-shadow {
-    box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.08);
-    clip-path: inset(0 -12px 0 0);
+  /*
+   * Applied to the last frozen column's cells when the user has
+   * scrolled horizontally. Uses a pseudo-element so the shadow
+   * extends beyond the cell boundary without being clipped.
+   */
+  .sticky-col-edge {
+    border-right: 1px solid #e2e8f0;
   }
 
-  /* Sticky header bottom shadow */
-  .sticky-header-shadow {
-    box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.08);
-    clip-path: inset(0 0 -12px 0);
+  .sticky-col-edge::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -6px;
+    bottom: 0;
+    width: 6px;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.06), transparent);
+    pointer-events: none;
   }
 }
