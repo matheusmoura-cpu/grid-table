@@ -13,6 +13,7 @@ import type { MachineRecord, ViewMode } from '../types';
 import { ALL_COLUMNS } from '../data/machines';
 import { StatusBadge } from './StatusBadge';
 import { HighlightedCell } from './HighlightedCell';
+import { RowActionsMenu } from './RowActionsMenu';
 
 interface DataTableProps {
   data: MachineRecord[];
@@ -30,6 +31,8 @@ interface DataTableProps {
   onToggleRow: (id: number) => void;
   onToggleAll: (ids: number[]) => void;
   onSiteClick: (machineId: number) => void;
+  onEdit: (id: number) => void;
+  onMoveMachine: (ids: number[]) => void;
 }
 
 const statusColumns = new Set(['connectivityStatus', 'commissioningState', 'workingState', 'targetWorkingState']);
@@ -63,6 +66,8 @@ export function DataTable({
   onToggleRow,
   onToggleAll,
   onSiteClick,
+  onEdit,
+  onMoveMachine,
 }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
@@ -319,6 +324,16 @@ export function DataTable({
                       </th>
                     );
                   }),
+
+                  // Actions column header — no sort, fixed width
+                  <th
+                    key="__actions__"
+                    className={`border-b border-slate-200 select-none sticky top-0 z-20
+                               ${isCompact ? 'px-2 py-2' : 'px-2 py-3'}`}
+                    style={{ width: 44, minWidth: 44, backgroundColor: ROW_BG.header }}
+                    scope="col"
+                    aria-label="Row actions"
+                  />,
                 ];
               })}
             </tr>
@@ -398,6 +413,19 @@ export function DataTable({
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
+
+                  {/* Actions cell — kebab menu, always last */}
+                  <td
+                    className={`border-b border-slate-100 ${isCompact ? 'px-2 py-1' : 'px-2 py-2.5'}`}
+                    style={{ width: 44, minWidth: 44 }}
+                    role="gridcell"
+                  >
+                    <RowActionsMenu
+                      record={row.original}
+                      onEdit={onEdit}
+                      onMoveMachine={onMoveMachine}
+                    />
+                  </td>
                 </tr>
               );
             })}
@@ -426,12 +454,6 @@ export function DataTable({
               <span className="text-slate-400"> (filtered from {totalCount})</span>
             )}
           </p>
-
-          {selectedIds.size > 0 && (
-            <span className="text-sm text-blue-600 font-medium">
-              {selectedIds.size} selected
-            </span>
-          )}
 
           <div className="flex items-center gap-2">
             <label htmlFor="page-size" className="text-sm text-slate-500">Rows:</label>

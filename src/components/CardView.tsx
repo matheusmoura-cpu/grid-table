@@ -3,6 +3,7 @@ import { ALL_COLUMNS } from '../data/machines';
 import { StatusBadge } from './StatusBadge';
 import { HighlightedCell } from './HighlightedCell';
 import { Wifi, WifiOff, AlertTriangle } from 'lucide-react';
+import { RowActionsMenu } from './RowActionsMenu';
 
 interface CardViewProps {
   data: MachineRecord[];
@@ -11,6 +12,8 @@ interface CardViewProps {
   selectedIds: Set<number>;
   onToggleRow: (id: number) => void;
   onSiteClick: (machineId: number) => void;
+  onEdit: (id: number) => void;
+  onMoveMachine: (ids: number[]) => void;
 }
 
 const statusColumns = ['connectivityStatus', 'commissioningState', 'workingState', 'targetWorkingState'];
@@ -21,7 +24,7 @@ function getConnectivityIcon(status: string) {
   return <WifiOff className="h-4 w-4 text-slate-400" />;
 }
 
-export function CardView({ data, visibleColumns, matches, selectedIds, onToggleRow, onSiteClick }: CardViewProps) {
+export function CardView({ data, visibleColumns, matches, selectedIds, onToggleRow, onSiteClick, onEdit, onMoveMachine }: CardViewProps) {
   if (data.length === 0) {
     return (
       <div className="text-center py-12 text-slate-500">
@@ -76,7 +79,7 @@ export function CardView({ data, visibleColumns, matches, selectedIds, onToggleR
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 ml-2">
+              <div className="flex items-center gap-1.5 ml-2">
                 {getConnectivityIcon(record.connectivityStatus)}
                 {record.activeAlarms > 0 && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-700
@@ -85,6 +88,13 @@ export function CardView({ data, visibleColumns, matches, selectedIds, onToggleR
                     {record.activeAlarms}
                   </span>
                 )}
+                <div className="group/row">
+                  <RowActionsMenu
+                    record={record}
+                    onEdit={onEdit}
+                    onMoveMachine={onMoveMachine}
+                  />
+                </div>
               </div>
             </div>
 
