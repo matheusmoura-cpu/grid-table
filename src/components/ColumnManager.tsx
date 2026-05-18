@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings2, Eye, EyeOff, GripVertical, Lock } from 'lucide-react';
+import { Settings2, Eye, EyeOff, GripVertical } from 'lucide-react';
 import { ALL_COLUMNS } from '../data/machines';
 import {
   DndContext,
@@ -18,9 +18,6 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-// Columns that are permanently visible and cannot be reordered or hidden.
-const PROTECTED_COLUMNS = new Set(['site']);
 
 interface ColumnManagerProps {
   visibleColumns: string[];
@@ -45,12 +42,7 @@ function SortableItem({ id, label, isVisible, onToggle }: {
       className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm
                   ${isVisible ? 'bg-white' : 'bg-slate-50 text-slate-400'}`}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab text-slate-400 hover:text-slate-600"
-        aria-label="Drag to reorder"
-      >
+      <button {...attributes} {...listeners} className="cursor-grab text-slate-400 hover:text-slate-600" aria-label="Drag to reorder">
         <GripVertical className="h-4 w-4" />
       </button>
       <button
@@ -73,18 +65,12 @@ export function ColumnManager({ visibleColumns, columnOrder, onToggleColumn, onR
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Only non-protected columns participate in drag-and-drop.
-  const sortableKeys = columnOrder.filter(k => !PROTECTED_COLUMNS.has(k));
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIndex = sortableKeys.indexOf(active.id as string);
-      const newIndex = sortableKeys.indexOf(over.id as string);
-      const reordered = arrayMove(sortableKeys, oldIndex, newIndex);
-      // Re-prepend protected columns in their original relative order.
-      const protectedInOrder = columnOrder.filter(k => PROTECTED_COLUMNS.has(k));
-      onReorderColumns([...protectedInOrder, ...reordered]);
+      const oldIndex = columnOrder.indexOf(active.id as string);
+      const newIndex = columnOrder.indexOf(over.id as string);
+      onReorderColumns(arrayMove(columnOrder, oldIndex, newIndex));
     }
   };
 
@@ -111,35 +97,9 @@ export function ColumnManager({ visibleColumns, columnOrder, onToggleColumn, onR
               <p className="text-xs text-slate-400 mt-0.5">Drag to reorder, click eye to toggle</p>
             </div>
             <div className="max-h-96 overflow-auto p-2 space-y-1">
-              {/* Protected columns — static, non-interactive */}
-              {columnOrder
-                .filter(k => PROTECTED_COLUMNS.has(k))
-                .map(key => {
-                  const col = ALL_COLUMNS.find(c => c.key === key);
-                  if (!col) return null;
-                  return (
-                    <div
-                      key={key}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-slate-50"
-                      aria-label={`${col.label} — always visible`}
-                    >
-                      <span className="text-slate-300 w-4 flex items-center justify-center" aria-hidden="true">
-                        <GripVertical className="h-4 w-4" />
-                      </span>
-                      <Lock className="h-4 w-4 text-slate-300 flex-shrink-0" aria-hidden="true" />
-                      <span className="flex-1 text-slate-500">{col.label}</span>
-                      <span className="text-[10px] font-medium text-slate-400 bg-slate-100
-                                       px-1.5 py-0.5 rounded-full leading-tight">
-                        Pinned
-                      </span>
-                    </div>
-                  );
-                })}
-
-              {/* Sortable columns */}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={sortableKeys} strategy={verticalListSortingStrategy}>
-                  {sortableKeys.map(key => {
+                <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                  {columnOrder.map(key => {
                     const col = ALL_COLUMNS.find(c => c.key === key);
                     if (!col) return null;
                     return (

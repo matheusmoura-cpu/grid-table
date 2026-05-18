@@ -16,39 +16,11 @@ const defaultPreferences: UserPreferences = {
   savedFilterSets: [],
 };
 
-const PROTECTED_COLUMNS = ['site'] as const;
-
-function enforceProtectedColumns(prefs: UserPreferences): UserPreferences {
-  let { visible, order } = prefs.columns;
-
-  // Ensure every protected column is always visible.
-  for (const col of PROTECTED_COLUMNS) {
-    if (!visible.includes(col)) {
-      visible = [col, ...visible];
-    }
-  }
-
-  // Ensure protected columns appear first in order (in definition order).
-  const protectedInOrder = PROTECTED_COLUMNS.filter(col => order.includes(col));
-  const rest = order.filter(col => !(PROTECTED_COLUMNS as readonly string[]).includes(col));
-  order = [...protectedInOrder, ...rest];
-
-  // Add any protected columns that were somehow absent from order.
-  for (const col of PROTECTED_COLUMNS) {
-    if (!order.includes(col)) {
-      order = [col, ...order];
-    }
-  }
-
-  return { ...prefs, columns: { ...prefs.columns, visible, order } };
-}
-
 export function loadPreferences(): UserPreferences {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return { ...defaultPreferences };
-    const loaded: UserPreferences = { ...defaultPreferences, ...JSON.parse(raw) };
-    return enforceProtectedColumns(loaded);
+    return { ...defaultPreferences, ...JSON.parse(raw) };
   } catch {
     return { ...defaultPreferences };
   }

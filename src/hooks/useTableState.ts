@@ -113,8 +113,6 @@ export function useTableState() {
   }, []);
 
   const toggleColumn = useCallback((key: string) => {
-    // Protected columns cannot be hidden.
-    if (key === 'site') return;
     setPreferences(prev => ({
       ...prev,
       columns: {
@@ -127,11 +125,9 @@ export function useTableState() {
   }, []);
 
   const reorderColumns = useCallback((newOrder: string[]) => {
-    // Protected columns must stay first in the order at all times.
-    const withProtected = newOrder.includes('site') ? newOrder : ['site', ...newOrder];
     setPreferences(prev => ({
       ...prev,
-      columns: { ...prev.columns, order: withProtected },
+      columns: { ...prev.columns, order: newOrder },
     }));
   }, []);
 
