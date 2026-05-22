@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-primary: #2563eb;
+    --color-primary-light: #3b82f6;
+    --color-primary-dark: #1d4ed8;
+  }
+
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+}
+
+@layer components {
+  .highlight-match {
+    background-color: #fef08a;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  /*
+   * Applied to the last frozen column's cells when the user has
+   * scrolled horizontally. Uses a pseudo-element so the shadow
+   * extends beyond the cell boundary without being clipped.
+   */
+  .sticky-col-edge {
+    border-right: 1px solid #e2e8f0;
+  }
+
+  .sticky-col-edge::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -6px;
+    bottom: 0;
+    width: 6px;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.06), transparent);
+    pointer-events: none;
+  }
+}
