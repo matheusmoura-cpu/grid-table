@@ -10,9 +10,11 @@ import {
 } from '@tanstack/react-table';
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import type { MachineRecord, ViewMode } from '../types';
+import type { TableAction, ActionDispatch } from '../types/actions';
 import { ALL_COLUMNS } from '../data/machines';
 import { StatusBadge } from './StatusBadge';
 import { HighlightedCell } from './HighlightedCell';
+import { RowActionsMenu } from './RowActionsMenu';
 
 interface DataTableProps {
   data: MachineRecord[];
@@ -30,6 +32,8 @@ interface DataTableProps {
   onToggleRow: (id: number) => void;
   onToggleAll: (ids: number[]) => void;
   onSiteClick: (machineId: number) => void;
+  rowActions: TableAction[];
+  onAction: ActionDispatch;
 }
 
 const statusColumns = new Set(['connectivityStatus', 'commissioningState', 'workingState', 'targetWorkingState']);
@@ -63,6 +67,8 @@ export function DataTable({
   onToggleRow,
   onToggleAll,
   onSiteClick,
+  rowActions,
+  onAction,
 }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
@@ -319,6 +325,17 @@ export function DataTable({
                       </th>
                     );
                   }),
+
+                  // Actions column — not managed by TanStack, keeps column customization clean.
+                  // Fixed 44px width; sticky top only (far-right edge, not horizontally frozen).
+                  <th
+                    key="__actions_header__"
+                    scope="col"
+                    aria-label="Row actions"
+                    className="border-b border-slate-200 select-none sticky top-0 z-20
+                               px-2 py-2"
+                    style={{ width: 44, minWidth: 44, backgroundColor: ROW_BG.header }}
+                  />,
                 ];
               })}
             </tr>
@@ -398,6 +415,19 @@ export function DataTable({
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
+
+                  {/* Actions cell — kebab menu, always last, not in TanStack column model */}
+                  <td
+                    className={`border-b border-slate-100 ${isCompact ? 'px-2 py-1' : 'px-2 py-2.5'}`}
+                    style={{ width: 44, minWidth: 44 }}
+                    role="gridcell"
+                  >
+                    <RowActionsMenu
+                      record={row.original}
+                      actions={rowActions}
+                      onAction={onAction}
+                    />
+                  </td>
                 </tr>
               );
             })}

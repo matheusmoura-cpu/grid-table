@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useCallback } from 'react';
 import { Download, Database, AlertCircle, Loader2 } from 'lucide-react';
 import { useTableState } from './hooks/useTableState';
 import { SearchBar, type SearchBarHandle } from './components/SearchBar';
@@ -8,7 +8,10 @@ import { ViewToggle } from './components/ViewToggle';
 import { DataTable } from './components/DataTable';
 import { CardView } from './components/CardView';
 import { SiteDetail } from './components/SiteDetail';
+import { BulkActionBar } from './components/BulkActionBar';
 import { exportToCsv } from './utils/csv';
+import { ROW_MENU_ACTIONS, BULK_BAR_ACTIONS } from './config/tableActions';
+import type { ActionDispatch } from './types/actions';
 
 const PAGE_TITLE = 'Machine Management Table Prototype';
 
@@ -52,6 +55,17 @@ function App() {
   const exportLabel = state.selectedIds.size > 0
     ? `Export ${state.selectedIds.size} Selected`
     : 'Export CSV';
+
+  /**
+   * Central action dispatcher — UI-only stub.
+   * Replace the empty body with real logic when the feature is implemented.
+   * actionId: matches TableAction.id in src/config/tableActions.ts
+   * ids: the affected MachineRecord ids
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleAction = useCallback<ActionDispatch>((_actionId, _ids) => {
+    // TODO: implement action handlers (actionId + affected row ids)
+  }, []);
 
   if (state.error) {
     return (
@@ -98,11 +112,6 @@ function App() {
               <h1 className="text-xl font-bold text-slate-900">{PAGE_TITLE}</h1>
               <p className="text-sm text-slate-500">
                 {state.filteredCount} of {state.totalCount} machines
-                {state.selectedIds.size > 0 && (
-                  <span className="text-blue-600 ml-2 font-medium">
-                    &middot; {state.selectedIds.size} selected
-                  </span>
-                )}
               </p>
             </div>
           </div>
@@ -165,20 +174,12 @@ function App() {
                 onRemoveFilterSet={state.removeFilterSet}
               />
 
-              {state.selectedIds.size > 0 && (
-                <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200
-                                rounded-lg" role="status" aria-live="polite">
-                  <p className="text-sm text-blue-800">
-                    <span className="font-semibold">{state.selectedIds.size}</span> row{state.selectedIds.size !== 1 ? 's' : ''} selected
-                  </p>
-                  <button
-                    onClick={state.clearSelection}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Clear selection
-                  </button>
-                </div>
-              )}
+              <BulkActionBar
+                selectedIds={state.selectedIds}
+                actions={BULK_BAR_ACTIONS}
+                onAction={handleAction}
+                onClearSelection={state.clearSelection}
+              />
             </div>
 
             {/* Table or Cards — table fills remaining space */}
@@ -199,6 +200,8 @@ function App() {
                 onToggleRow={state.toggleRowSelection}
                 onToggleAll={state.toggleAllSelection}
                 onSiteClick={state.navigateToSite}
+                rowActions={ROW_MENU_ACTIONS}
+                onAction={handleAction}
               />
             ) : (
               <CardView
@@ -208,6 +211,8 @@ function App() {
                 selectedIds={state.selectedIds}
                 onToggleRow={state.toggleRowSelection}
                 onSiteClick={state.navigateToSite}
+                rowActions={ROW_MENU_ACTIONS}
+                onAction={handleAction}
               />
             )}
           </>
